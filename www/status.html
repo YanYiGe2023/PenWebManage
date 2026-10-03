@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>词典笔系统状态</title>
+    <meta http-equiv="refresh" content="5">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h1>📖 词典笔系统状态</h1>
+
+    <div class="actions">
+        <button id="restartBtn" class="warn">🔄 重启服务</button>
+        <button id="stopBtn" class="danger">⏹ 停止服务</button>
+    </div>
+    <div id="ctrlMsg"></div>
+
+    <script>
+    async function callControl(path, label) {
+        const msg = document.getElementById('ctrlMsg');
+        msg.textContent = '正在' + label + '...';
+        msg.style.color = '#888';
+
+        try {
+            await fetch(path, { method: 'POST' });
+        } catch (e) {
+            // 停止/重启会断开连接，属预期
+        }
+        document.body.innerHTML =
+            '<h1>' + label + '中...</h1>' +
+            '<p style="color:#888">请稍候几秒后刷新页面。</p>';
+    }
+
+    document.getElementById('stopBtn').addEventListener('click', () => {
+        if (confirm('确定要停止 Web 服务吗？')) callControl('/shutdown', '停止');
+    });
+    document.getElementById('restartBtn').addEventListener('click', () => {
+        if (confirm('确定要重启 Web 服务吗？')) callControl('/restart', '重启');
+    });
+    </script>
+
+    <div class="stat">
+        <div class="label">CPU 使用率</div>
+        <div class="value">{{ cpu_percent }}%</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">内存</div>
+        <div class="value">{{ mem_percent }}% ({{ mem_used_mb }}MB / {{ mem_total_mb }}MB)</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">磁盘</div>
+        <div class="value">{{ disk_percent }}% ({{ disk_used }} / {{ disk_total }})</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">CPU 温度</div>
+        <div class="value">{{ cpu_temp }}°C</div>
+    </div>
+</body>
+</html>

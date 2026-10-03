@@ -1,0 +1,37 @@
+body {
+    font-family: monospace;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    padding: 20px;
+    margin: 0;
+}
+
+h1 {
+    color: #00d9ff;
+    font-size: 1.2em;
+}
+
+.stat {
+    margin: 12px 0;
+    padding: 10px;
+    background: #16213e;
+    border-radius: 6px;
+}
+
+.label {
+    color: #888;
+    font-size: 0.85em;
+}
+
+.value {
+    color: #00ff88;
+    font-size: 1.1em;
+}
+
+.actions { margin-top: 20px; display: flex; gap: 10px; }
+button { padding: 10px 18px; border: none; border-radius: 6px;
+         font-size: 1em; cursor: pointer; color: #fff; }
+.warn   { background: #d68910; }
+.warn:hover { background: #f39c12; }
+.danger { background: #c0392b; }
+.danger:hover { background: #e74c3c; }
