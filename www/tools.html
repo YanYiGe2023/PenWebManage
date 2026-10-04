@@ -5,104 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>工具</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        body { padding: 16px; }
-        h2 {
-            color: #00d9ff;
-            font-size: 1em;
-            margin: 0 0 12px;
-        }
-        .tabs {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 12px;
-        }
-        .tab {
-            padding: 6px 14px;
-            background: #16213e;
-            color: #aaa;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.9em;
-            user-select: none;
-        }
-        .tab:hover { background: #1f2a4a; color: #e0e0e0; }
-        .tab.active {
-            background: #0f3460;
-            color: #00d9ff;
-        }
-        .tab .badge {
-            display: inline-block;
-            margin-left: 6px;
-            padding: 0 6px;
-            background: #0a1a2f;
-            border-radius: 8px;
-            font-size: 0.85em;
-            color: #888;
-        }
-        .tab.active .badge { color: #00d9ff; }
-
-        .word-list { list-style: none; padding: 0; margin: 0; }
-        .word-item {
-            padding: 10px 12px;
-            margin-bottom: 8px;
-            background: #16213e;
-            border-radius: 6px;
-            border-left: 3px solid #0f3460;
-        }
-        .word-item .head {
-            display: flex;
-            justify-content: space-between;
-            align-items: baseline;
-            margin-bottom: 4px;
-        }
-        .word-item .word {
-            color: #00ff88;
-            font-size: 1.05em;
-            font-weight: bold;
-        }
-        .word-item .time {
-            color: #666;
-            font-size: 0.8em;
-        }
-        .word-item .content {
-            color: #ccc;
-            font-size: 0.9em;
-            line-height: 1.4;
-        }
-        .word-item .star {
-            color: #ffcc00;
-            margin-left: 6px;
-        }
-
-        .empty, .error {
-            padding: 20px;
-            text-align: center;
-            color: #888;
-            font-size: 0.9em;
-        }
-        .error {
-            background: #4a1e1e;
-            border-left: 4px solid #ff5555;
-            border-radius: 6px;
-            color: #ffb3b3;
-            text-align: left;
-        }
-        .error code {
-            display: block;
-            margin-top: 6px;
-            color: #ff8888;
-            font-size: 0.85em;
-            word-break: break-all;
-        }
-        .loading { color: #888; padding: 20px; text-align: center; }
-    </style>
 </head>
 <body>
-    <h2>📚 扫描历史</h2>
+<div class="page">
+    <div class="toolbar">
+        <h2>📚 扫描历史</h2>
+        <div>
+            <span class="updated-at" id="updatedAt"></span>
+            <button class="btn-refresh" id="refreshBtn">🔄 刷新</button>
+        </div>
+    </div>
 
     <div id="loading" class="loading">加载中...</div>
-    <div id="error" class="error" style="display:none;"></div>
+    <div id="error" class="error-banner" style="display:none;"></div>
 
     <div id="main" style="display:none;">
         <div class="tabs">
@@ -115,6 +30,7 @@
         </div>
         <ul class="word-list" id="wordList"></ul>
     </div>
+</div>
 
 <script>
 let historyData = null;
@@ -128,6 +44,21 @@ function fmtTime(ms) {
            `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+function nowStr() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, "0");
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function escapeHtml(s) {
+    return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 function renderList() {
     const list = document.getElementById("wordList");
     const items = historyData[currentLang] || [];
@@ -137,7 +68,6 @@ function renderList() {
         return;
     }
 
-    // 按时间倒序，最新的在最上面
     const sorted = [...items].sort((a, b) => (b.time || 0) - (a.time || 0));
 
     list.innerHTML = sorted.map(item => {
@@ -157,27 +87,33 @@ function renderList() {
     }).join("");
 }
 
-function escapeHtml(s) {
-    return String(s)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-}
-
 function switchLang(lang) {
     currentLang = lang;
     document.querySelectorAll(".tab").forEach(t => {
         t.classList.toggle("active", t.dataset.lang === lang);
     });
-    renderList();
+    if (historyData) renderList();
 }
 
-async function load() {
+// ========== 拉取数据（只请求 API，不刷新页面）==========
+
+async function refresh() {
+    const btn = document.getElementById("refreshBtn");
     const loading = document.getElementById("loading");
     const errorEl = document.getElementById("error");
     const main = document.getElementById("main");
+    const updatedAt = document.getElementById("updatedAt");
+
+    btn.disabled = true;
+    const oldText = btn.textContent;
+    btn.textContent = "刷新中...";
+    updatedAt.style.color = "#666";
+
+    // 首次加载显示 loading；后续刷新不闪 loading，避免闪烁
+    if (!historyData) {
+        loading.style.display = "block";
+    }
+    errorEl.style.display = "none";
 
     try {
         const res = await fetch("/api/scan-history");
@@ -190,6 +126,10 @@ async function load() {
             errorEl.innerHTML =
                 `⚠️ ${escapeHtml(data.msg || "当前设备不支持此功能")}` +
                 (data.path ? `<code>${escapeHtml(data.path)}</code>` : "");
+            main.style.display = "none";
+            historyData = null;
+            updatedAt.textContent = "刷新失败";
+            updatedAt.style.color = "#ff5555";
             return;
         }
 
@@ -199,18 +139,30 @@ async function load() {
         main.style.display = "block";
         renderList();
 
+        updatedAt.textContent = "更新于 " + nowStr();
+
     } catch (e) {
         loading.style.display = "none";
         errorEl.style.display = "block";
         errorEl.textContent = "加载失败: " + e.message;
+        main.style.display = "none";
+        updatedAt.textContent = "刷新失败";
+        updatedAt.style.color = "#ff5555";
+    } finally {
+        btn.disabled = false;
+        btn.textContent = oldText;
     }
 }
+
+document.getElementById("refreshBtn").addEventListener("click", refresh);
 
 document.querySelectorAll(".tab").forEach(tab => {
     tab.addEventListener("click", () => switchLang(tab.dataset.lang));
 });
 
-load();
+// 页面打开时拉一次
+refresh();
 </script>
+
 </body>
 </html>

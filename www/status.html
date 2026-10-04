@@ -7,6 +7,15 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+<div class="page">
+    <div class="toolbar">
+        <h2>📊 系统状态</h2>
+        <div>
+            <span class="updated-at" id="updatedAt"></span>
+            <button class="btn-refresh" id="refreshBtn">🔄 刷新</button>
+        </div>
+    </div>
+
     <div id="platformError" class="error-banner" style="display:none;">
         ⚠️ 当前运行平台（<span id="platformName"></span>）不支持系统信息采集，请部署到 Linux 设备。
     </div>
@@ -32,10 +41,11 @@
     </div>
 
     <div class="actions">
-        <button id="restartBtn" class="warn">🔄 重启服务</button>
-        <button id="stopBtn" class="danger">⏹ 停止服务</button>
+        <button id="restartBtn" class="btn-warn">🔄 重启服务</button>
+        <button id="stopBtn" class="btn-danger">⏹ 停止服务</button>
     </div>
     <div id="ctrlMsg"></div>
+</div>
 
 <script>
 // ========== 工具 ==========
@@ -150,5 +160,6 @@ document.getElementById("restartBtn").addEventListener("click", () => {
     if (confirm("确定要重启 Web 服务吗？")) callControl("/restart", "重启");
 });
 </script>
+
 </body>
 </html>
