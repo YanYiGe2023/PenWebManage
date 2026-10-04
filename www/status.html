@@ -3,12 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>词典笔系统状态</title>
-    <meta http-equiv="refresh" content="5">
+    <title>系统状态</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>📖 词典笔系统状态</h1>
+    <div id="platformError" class="error-banner" style="display:none;">
+        ⚠️ 当前运行平台（<span id="platformName"></span>）不支持系统信息采集，请部署到 Linux 设备。
+    </div>
+
+    <div class="stat">
+        <div class="label">CPU 使用率</div>
+        <div class="value" id="cpu">--</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">内存</div>
+        <div class="value" id="mem">--</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">磁盘</div>
+        <div class="value" id="disk">--</div>
+    </div>
+
+    <div class="stat">
+        <div class="label">CPU 温度</div>
+        <div class="value" id="temp">--</div>
+    </div>
 
     <div class="actions">
         <button id="restartBtn" class="warn">🔄 重启服务</button>
@@ -16,48 +37,118 @@
     </div>
     <div id="ctrlMsg"></div>
 
-    <script>
-    async function callControl(path, label) {
-        const msg = document.getElementById('ctrlMsg');
-        msg.textContent = '正在' + label + '...';
-        msg.style.color = '#888';
+<script>
+// ========== 工具 ==========
 
-        try {
-            await fetch(path, { method: 'POST' });
-        } catch (e) {
-            // 停止/重启会断开连接，属预期
-        }
-        document.body.innerHTML =
-            '<h1>' + label + '中...</h1>' +
-            '<p style="color:#888">请稍候几秒后刷新页面。</p>';
+function fmtBytes(bytes) {
+    if (!bytes) return "0B";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let i = 0;
+    while (bytes >= 1024 && i < units.length - 1) {
+        bytes /= 1024;
+        i++;
+    }
+    return bytes.toFixed(1) + units[i];
+}
+
+function pct(used, total) {
+    if (!total) return "0.0";
+    return (used / total * 100).toFixed(1);
+}
+
+function color(p) {
+    if (p < 60) return "#00ff88";
+    if (p < 85) return "#ffcc00";
+    return "#ff5555";
+}
+
+// ========== 渲染 ==========
+
+function render(d) {
+    const errBanner = document.getElementById("platformError");
+    const cpuEl = document.getElementById("cpu");
+    const memEl = document.getElementById("mem");
+    const diskEl = document.getElementById("disk");
+    const tempEl = document.getElementById("temp");
+
+    if (!d.platform_ok) {
+        // 平台不支持：显示横幅，数值全部置为 N/A
+        errBanner.style.display = "block";
+        document.getElementById("platformName").textContent = d.platform || "unknown";
+        [cpuEl, memEl, diskEl, tempEl].forEach(el => {
+            el.textContent = "N/A";
+            el.style.color = "#555";
+        });
+        return;
     }
 
-    document.getElementById('stopBtn').addEventListener('click', () => {
-        if (confirm('确定要停止 Web 服务吗？')) callControl('/shutdown', '停止');
-    });
-    document.getElementById('restartBtn').addEventListener('click', () => {
-        if (confirm('确定要重启 Web 服务吗？')) callControl('/restart', '重启');
-    });
-    </script>
+    errBanner.style.display = "none";
 
-    <div class="stat">
-        <div class="label">CPU 使用率</div>
-        <div class="value">{{ cpu_percent }}%</div>
-    </div>
+    // CPU
+    cpuEl.textContent = d.cpu_percent.toFixed(1) + "%";
+    cpuEl.style.color = color(d.cpu_percent);
 
-    <div class="stat">
-        <div class="label">内存</div>
-        <div class="value">{{ mem_percent }}% ({{ mem_used_mb }}MB / {{ mem_total_mb }}MB)</div>
-    </div>
+    // 内存
+    const memUsed = d.mem.total - d.mem.available;
+    const memPct = pct(memUsed, d.mem.total);
+    memEl.textContent = `${memPct}% (${fmtBytes(memUsed)} / ${fmtBytes(d.mem.total)})`;
+    memEl.style.color = color(parseFloat(memPct));
 
-    <div class="stat">
-        <div class="label">磁盘</div>
-        <div class="value">{{ disk_percent }}% ({{ disk_used }} / {{ disk_total }})</div>
-    </div>
+    // 磁盘
+    const diskUsed = d.disk.total - d.disk.free;
+    const diskPct = pct(diskUsed, d.disk.total);
+    diskEl.textContent = `${diskPct}% (${fmtBytes(diskUsed)} / ${fmtBytes(d.disk.total)})`;
+    diskEl.style.color = color(parseFloat(diskPct));
 
-    <div class="stat">
-        <div class="label">CPU 温度</div>
-        <div class="value">{{ cpu_temp }}°C</div>
-    </div>
+    // 温度
+    if (d.cpu_temp !== null && d.cpu_temp !== undefined) {
+        const c = (d.cpu_temp / 1000).toFixed(1);
+        tempEl.textContent = c + "°C";
+        tempEl.style.color = color(parseFloat(c));
+    } else {
+        tempEl.textContent = "N/A";
+        tempEl.style.color = "#888";
+    }
+}
+
+// ========== 拉取数据 ==========
+
+async function refresh() {
+    try {
+        const res = await fetch("/api/status");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        render(data);
+    } catch (e) {
+        console.error("拉取状态失败:", e);
+    }
+}
+
+refresh();
+setInterval(refresh, 5000);
+
+// ========== 控制按钮 ==========
+
+async function callControl(path, label) {
+    const msg = document.getElementById("ctrlMsg");
+    msg.textContent = "正在" + label + "...";
+    msg.style.color = "#888";
+
+    try {
+        await fetch(path, { method: "POST" });
+    } catch (e) {}
+
+    document.body.innerHTML =
+        "<h1>" + label + "中...</h1>" +
+        '<p style="color:#888">请稍候几秒后刷新页面。</p>';
+}
+
+document.getElementById("stopBtn").addEventListener("click", () => {
+    if (confirm("确定要停止 Web 服务吗？")) callControl("/shutdown", "停止");
+});
+document.getElementById("restartBtn").addEventListener("click", () => {
+    if (confirm("确定要重启 Web 服务吗？")) callControl("/restart", "重启");
+});
+</script>
 </body>
 </html>

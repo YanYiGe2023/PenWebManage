@@ -35,3 +35,13 @@ button { padding: 10px 18px; border: none; border-radius: 6px;
 .warn:hover { background: #f39c12; }
 .danger { background: #c0392b; }
 .danger:hover { background: #e74c3c; }
+.error-banner {
+    margin: 12px 0 20px;
+    padding: 12px 14px;
+    background: #4a1e1e;
+    border-left: 4px solid #ff5555;
+    border-radius: 6px;
+    color: #ffb3b3;
+    font-size: 0.95em;
+    line-height: 1.5;
+}
